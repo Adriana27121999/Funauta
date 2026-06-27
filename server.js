@@ -9,7 +9,7 @@ require('dotenv').config();
 
 // ==================== CONFIGURACIÓN ====================
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 // ==================== MIDDLEWARE ====================
 app.use(cors());
@@ -1073,6 +1073,19 @@ app.post('/login', async (req, res) => {
   const { correo, password, rol } = req.body;
   const ip = req.ip || req.connection?.remoteAddress || 'desconocido';
 
+  // Normalizar valores cortos de rol que puede enviar el cliente (compatibilidad hacia atrás)
+  const normalizeRole = (r) => {
+    if (!r) return r;
+    const map = {
+      admin: 'administrador',
+      specialist: 'especialista',
+      parents: 'padre'
+    };
+    return map[r] || r;
+  };
+
+  const requestedRole = normalizeRole(rol);
+
   if (!correo || !password || !rol) {
     return res.status(400).json({ 
       success: false, 
@@ -1118,7 +1131,7 @@ app.post('/login', async (req, res) => {
       await registrarAuditoria(
         null,
         correo,
-        rol,
+        requestedRole,
         'login_fallido',
         'usuario',
         null,
@@ -1135,7 +1148,7 @@ app.post('/login', async (req, res) => {
     const usuario = userResult.rows[0];
     const rolNombre = usuario.rol_nombre;
     
-    if (rolNombre !== rol) {
+    if (rolNombre !== requestedRole) {
       // Registrar intento fallido por rol incorrecto
       await registrarAuditoria(
         usuario.id_usuario,
@@ -1219,7 +1232,7 @@ app.post('/login', async (req, res) => {
     await registrarAuditoria(
       null,
       correo,
-      rol,
+      requestedRole,
       'error',
       'sistema',
       null,
